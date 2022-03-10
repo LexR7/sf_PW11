@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage ('Зачистим перед выполнением') {
+            steps {
+                script {
+                    try {
+                        sh "docker kill sfpw11-nginx && docker container rm sfpw11-nginx"
+                    }
+                    catch (exc) {
+                        echo 'Нечего удалять, все норм!'
+                    }
+                }
+            }
+        }
+
+        stage('Стягиваем код из ГИТа') {
+            steps {
+                git 'https://github.com/LexR7/sf_PW11.git'
+            }
+        }
+        stage('Запуск nginx в докер контейнере') {
+            steps {
+                sh "docker run --name sfpw11-nginx -d -p 9889:80 -v ${WORKSPACE}/www:/usr/share/nginx/html:ro -d nginx"
+            }
+        }
+        stage('Проверка') {
+            steps {
+                script {
+                    response = sh (script: "curl -s -o /dev/null -w \"%{http_code}\" http://localhost:9889", returnStdout: true).trim()
+                    if (response == '200') {
+                      sh "curl -s http://localhost:9889"
+                    }
+                    else {
+                      unstable "Ошибка при обращении к nginx!"
+                      mail body: 'Ошибка при обращении к nginx!', subject: 'Ошибка пайплайн', to: 'AlexeyVR7@yandex.ru'
+                    }
+                    md5_local = sh (script: "md5sum index.html| cut -d ' ' -f 1", returnStdout: true).trim()
+                    md5_nginx = sh (script: "curl -sL http://localhost:9889 | md5sum | cut -d ' ' -f 1", returnStdout: true).trim()
+                    if (md5_local == md5_nginx) {
+                        echo "Все ОК. MD5 сумма локального файла и полученного через nginx равны"
+                    }
+                    else {
+                        unstable "MD5 сумма локального файла не равна возвращаемого через nginx!"
+                        mail body: 'Ошибка! MD5 сумма локального файла не равна возвращаемого через nginx.', subject: 'Ошибка пайплайн', to: 'AlexeyVR7@yandex.ru'
+                    }
+                }
+            }
+        }
+        stage('Остановка и удаление контейнера') {
+            steps {
+                sh "docker kill sfpw11-nginx && docker container rm sfpw11-nginx"
+            }
+        }
+    }
+}
+
