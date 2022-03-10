@@ -37,7 +37,7 @@ pipeline {
                       unstable "Ошибка при обращении к nginx!"
                       mail body: 'Ошибка при обращении к nginx!', subject: 'Ошибка пайплайн', to: 'AlexeyVR7@yandex.ru'
                     }
-                    md5_local = sh (script: "md5sum index.html| cut -d ' ' -f 1", returnStdout: true).trim()
+                    md5_local = sh (script: "md5sum www/index.html| cut -d ' ' -f 1", returnStdout: true).trim()
                     md5_nginx = sh (script: "curl -sL http://localhost:9889 | md5sum | cut -d ' ' -f 1", returnStdout: true).trim()
                     if (md5_local == md5_nginx) {
                         echo "Все ОК. MD5 сумма локального файла и полученного через nginx равны"
